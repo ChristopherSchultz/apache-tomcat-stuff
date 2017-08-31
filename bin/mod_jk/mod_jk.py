@@ -152,8 +152,7 @@ def usage(script):
 jk_status_path='/jk-status'
 protocol = 'https://'
 confFile = os.path.dirname(sys.argv[0]) + '/mod_jk.conf'
-attributes = [ 'activation', 'state' ]
-
+attributes = []
 servers = [ ]
 balancers=[ ]
 workers = [ ]
@@ -187,10 +186,10 @@ settings = {}
 try:
     opts, args = getopt.getopt(sys.argv[1:],
                                'hc:s:b:w:a:u:c:',
-                               ['server=', 'balancer=', 'worker=', '--attribute',
-                                '--update',
-                                '--config',
-                                '--'])
+                               ['server=', 'balancer=', 'worker=', 'attribute=',
+                                'update',
+                                'config',
+                                ''])
 except getopt.GetoptError:
     usage(sys.argv[0])
     sys.exit(2)
@@ -227,10 +226,17 @@ for opt, arg in opts:
             if not arg in workers:
                 workers.append(arg)
     elif opt in ('-a', '--attribute'):
-        if arg[0] == '-':
+        if arg[0] == '+':
+            arg = arg[1:]
+            if not arg in attributes:
+                attributes.append(arg)
+        elif arg[0] == '-':
             arg = arg[1:]
             if arg in attributes:
                 attributes.remove(arg)
+        elif arg[0] == '=':
+            arg = arg[1:]
+            attributes = [ arg ]
         else:
             if not arg in attributes:
                 attributes.append(arg)
@@ -243,7 +249,10 @@ read_config(confFile, settings)
 if 'servers' in settings: servers = settings['servers']
 if 'balancers' in settings: balancers = settings['balancers']
 if 'workers' in settings: balancers = settings['workers']
-if 'attributes' in settings: attributes = settings['attributes']
+if not attributes:
+  if 'attributes' in settings: attributes = settings['attributes']
+  else : attributes = [ 'activation', 'state' ]
+
 if 'username' in settings: username = settings['username'][0]
 if 'skip_hostname_verification' in settings : skip_hostname_verification = (settings['skip_hostname_verification'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
 if 'password' in settings: password = settings['password'][0]
