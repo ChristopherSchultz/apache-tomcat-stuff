@@ -150,7 +150,7 @@ def usage(script):
 # Can add port number if desired
 
 jk_status_path='/jk-status'
-protocol = 'http://'
+protocol = 'https://'
 confFile = os.path.dirname(sys.argv[0]) + '/mod_jk.conf'
 attributes = [ 'activation', 'state' ]
 
