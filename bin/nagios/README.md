@@ -47,7 +47,7 @@ A script for Nagios and Nagios-like monitoring systems that probes a Tomcat inst
         from the JMX proxy will be compared. Append a ':' to the end of
         the warning value in order to perform a less-than comparison.
     
-###Example
+### Example
     check_jmxproxy -U 'http://host/manager/jmxproxy?get=java.lang:type=Memory&att=HeapMemoryUsage&key=used' -w 33554432 -c 50331648
     
 This example will report CRITICAL if the current JVM heap size exceeds 48MiB or WARN if the heap size exceeds 32MiB.
