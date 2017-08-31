@@ -6,7 +6,7 @@
 # and compares the return value to the warning and critical values
 # provided as parameters to this script.
 #
-# Copyright (c) 2012 Christopher Schultz
+# Copyright (c) 2012-2017 Christopher Schultz
 #
 # Christopher Schultz licenses this file to You under the Apache License,
 # Version 2.0 (the "License"); you may not use this file except in
