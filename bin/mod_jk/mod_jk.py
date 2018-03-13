@@ -160,6 +160,7 @@ workers = [ ]
 username=''
 password=''
 skip_hostname_verification = False
+ignore_cert_checks = False
 
 attribute_map = {
                   'state'      : None,
@@ -255,6 +256,7 @@ if not attributes:
 
 if 'username' in settings: username = settings['username'][0]
 if 'skip_hostname_verification' in settings : skip_hostname_verification = (settings['skip_hostname_verification'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
+if 'ignore_cert_checks' in settings : ignore_cert_checks = (settings['ignore_cert_checks'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
 if 'password' in settings: password = settings['password'][0]
 if 'jk_status_path' in settings : jk_status_path = settings['jk_status_path'][0]
 if 'protocol' in settings : protocol = settings['protocol'][0]
@@ -281,12 +283,14 @@ if username and password :
 else :
     auth_handler = None
 
+ctx = ssl.create_default_context()
+
 if skip_hostname_verification :
-    ctx = ssl.create_default_context()
     ctx.check_hostname = False
-    host_handler = urllib2.HTTPSHandler(0, context=ctx)
-else :
-    host_handler = None
+if ignore_cert_checks :
+    ctx.verify_mode = ssl.CERT_NONE
+
+host_handler = urllib2.HTTPSHandler(0, context=ctx)
 
 if auth_handler or host_handler :
     if auth_handler and host_handler :
