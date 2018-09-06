@@ -5,12 +5,8 @@ export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
 export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
 export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache-tomcat/openssl-1.0.2k/target}"
 
-#TOMCAT_MAJOR_VERSION=7
-#TOMCAT_VERSION="7.0.67"
-TOMCAT_MAJOR_VERSION=8
-TOMCAT_VERSION=8.5.19
-#TOMCAT_MAJOR_VERSION=9
-#TOMCAT_VERSION=9.0.0.M1
+TOMCAT_VERSION=${TOMCAT_VERSION-8.5.34}
+TOMCAT_MAJOR_VERSION=$(echo ${TOMCAT_VERSION} | sed 's/\..*//')
 
 # NOTE: Tomcat 7 needs JAVA_HOME to point to Java 6
 if [ "7" = "$TOMCAT_MAJOR_VERSION" ] ; then
@@ -69,18 +65,17 @@ for binary in ${BINARIES} ; do
     echo "Downloading ${binary}..."
     curl -\#O "${BASE_BINARY_URL}/${binary}"
     curl -\#O "${BASE_BINARY_URL}/${binary}.asc"
-    curl -\#O "${BASE_BINARY_URL}/${binary}.md5"
+    curl -\#O "${BASE_BINARY_URL}/${binary}.sha512"
   fi
 
-  # Check MD5 sums
-  #echo -n "md5($binary): "
-  md5sum --status -c ${binary}.md5 > /dev/null 2>&1
+  # Check SHA-2 sum
+  shasum -a 512 --status -bc ${binary}.sha512 > /dev/null 2>&1
   result=$?
 
   if [ "$result" = "0" ] ; then
-    echo "* Valid MD5 signature for ${binary}"
+    echo "* Valid SHA-256 signature for ${binary}"
   else
-    echo "* !! Invalid MD5 signature for ${binary}"
+    echo "* !! Invalid SHA-256 signature for ${binary}"
   fi
 
   # Check GPG Signatures
@@ -95,7 +90,7 @@ for binary in ${BINARIES} ; do
   fi
 done
 
-# Check to make tarball and zip contain the same files.
+# Check to make sure tarball and zip contain the same files.
 rm -rf zip tarball
 mkdir zip
 mkdir tarball
@@ -112,18 +107,17 @@ for source in ${SOURCES} ; do
     echo "Downloading ${source}..."
     curl -\#O "${BASE_SOURCE_URL}/${source}"
     curl -\#O "${BASE_SOURCE_URL}/${source}.asc"
-    curl -\#O "${BASE_SOURCE_URL}/${source}.md5"
+    curl -\#O "${BASE_SOURCE_URL}/${source}.sha512"
   fi
 
-  # Check MD5 sums
-  #echo -n "md5($source): "
-  md5sum --status -c ${source}.md5 > /dev/null 2>&1
+  # Check SHA-2 sum
+  sha512sum --status -c ${source}.sha512 > /dev/null 2>&1
   result=$?
 
   if [ "$result" = "0" ] ; then
-    echo "* Valid MD5 signature for $source"
+    echo "* Valid SHA512 signature for $source"
   else
-    echo "* !! Invalid MD5 signature for $source"
+    echo "* !! Invalid SHA512 signature for $source"
   fi
 
   # Check GPG Signatures
@@ -147,7 +141,7 @@ else
   echo !! NOT SAME
 fi
 
-# Check to make tarball and zip contain the same files.
+# Check to make sure source tarball and zip contain the same files.
 rm -rf zip tarball
 mkdir zip
 mkdir tarball
@@ -179,8 +173,8 @@ export ANT_OPTS="-Xmx512M"
 export JAVA_OPTS="-Xmx512M"
 BASE_DIR="`pwd`/tarball"
 BASE_SOURCE_DIR="${BASE_DIR}/${BASE_FILE_NAME}-src"
-/bin/echo -e "base.path=${BASE_DIR}/downloads\nexecute.validate=true\nexecute.validate=true\njava.7.home=${JAVA_7_HOME}\n" > "${BASE_SOURCE_DIR}/build.properties"
-JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile
+/bin/echo -e "base.path=${BASE_DIR}/downloads\nexecute.validate=true\nexecute.validate=true\njava.7.home=${JAVA_7_HOME}\nexecute.validate=false" > "${BASE_SOURCE_DIR}/build.properties"
+JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 
 result=$?
 echo "* Building dependencies returned: $result"
