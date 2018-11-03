@@ -20,8 +20,8 @@ export BUILD_JAVA_HOME="${BUILD_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_NATIVE_JAVA_HOME="${BUILD_NATIVE_JAVA_HOME:-$JAVA_HOME}"
 
 BASE_URL="https://dist.apache.org/repos/dist/dev/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_VERSION}"
-BASE_BINARY_URL="${BASE_URL}/bin/"
-BASE_SOURCE_URL="${BASE_URL}/src/"
+BASE_BINARY_URL="${BASE_URL}/bin"
+BASE_SOURCE_URL="${BASE_URL}/src"
 BASE_FILE_NAME="apache-tomcat-${TOMCAT_VERSION}"
 ZIPFILE="${BASE_FILE_NAME}.zip"
 TARBALL="${BASE_FILE_NAME}.tar.gz"
@@ -62,7 +62,7 @@ echo '*'
 for binary in ${BINARIES} ; do
 
   if [ ! -f "${binary}" ] ; then
-    echo "Downloading ${binary}..."
+    echo "Downloading ${BASE_BINARY_URL}/${binary}..."
     curl -\#O "${BASE_BINARY_URL}/${binary}"
     curl -\#O "${BASE_BINARY_URL}/${binary}.asc"
     curl -\#O "${BASE_BINARY_URL}/${binary}.sha512"
