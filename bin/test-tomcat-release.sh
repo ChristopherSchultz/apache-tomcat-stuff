@@ -193,7 +193,14 @@ export ANT_OPTS="-Xmx512M"
 export JAVA_OPTS="-Xmx512M"
 BASE_DIR="`pwd`/tarball"
 BASE_SOURCE_DIR="${BASE_DIR}/${BASE_FILE_NAME}-src"
-/bin/echo -e "base.path=${BASE_DIR}/downloads\nexecute.validate=true\nexecute.validate=true\njava.7.home=${JAVA_7_HOME}\nexecute.validate=false" > "${BASE_SOURCE_DIR}/build.properties"
+cat <<ENDEND > "${BASE_SOURCE_DIR}/build.properties"
+base.path=${BASE_DIR}/downloads
+execute.validate=true
+execute.validate=true
+java.7.home=${JAVA_7_HOME}
+execute.validate=false
+ENDEND
+
 if [ "yes" != "${OPENSSL_HOME}" ] ; then
   /bin/echo -e "\ntest.openssl.loc=${OPENSSL_HOME}/bin/openssl" >> "${BASE_SOURCE_DIR}/build.properties"
 fi
