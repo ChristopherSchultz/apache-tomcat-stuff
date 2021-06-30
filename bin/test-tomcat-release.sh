@@ -3,9 +3,10 @@
 export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
 export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
 export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
-export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache-tomcat/openssl-1.0.2k/target}"
+export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target}"
+OSSLSIGNCODE=$( command -v osslsigncode )
 
-TOMCAT_VERSION=${TOMCAT_VERSION-8.5.34}
+TOMCAT_VERSION=${TOMCAT_VERSION-8.5.69}
 TOMCAT_MAJOR_VERSION=$(echo ${TOMCAT_VERSION} | sed 's/\..*//')
 
 # NOTE: Tomcat 7 needs JAVA_HOME to point to Java 6
@@ -45,7 +46,7 @@ if [ -z "${OPENSSL_HOME}" ] ; then
   # Set OPENSSL_HOME=yes to use system-installed openssl version
   OPENSSL_HOME=yes
 else
-  echo '*  OpenSSL: ' `${OPENSSL_HOME}/bin/openssl version`
+  echo '*  OpenSSL: ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
 fi
 echo '*  APR:     ' `apr-1-config --version`
 echo '*'
@@ -73,9 +74,9 @@ for binary in ${BINARIES} ; do
   result=$?
 
   if [ "$result" = "0" ] ; then
-    echo "* Valid SHA-256 signature for ${binary}"
+    echo "* Valid SHA-512 signature for ${binary}"
   else
-    echo "* !! Invalid SHA-256 signature for ${binary}"
+    echo "* !! Invalid SHA-512 signature for ${binary}"
   fi
 
   # Check GPG Signatures
@@ -87,6 +88,19 @@ for binary in ${BINARIES} ; do
     echo "* Valid GPG signature for ${binary}"
   else
     echo "* !! Invalid GPG signature for ${binary}"
+  fi
+  if [ -n "${OSSLSIGNCODE}" ] ; then
+    case $binary in
+      *.exe)
+        ${OSSLSIGNCODE} verify "$binary"  | grep -q 'Subject:.*Apache ' > /dev/null
+        result=$?
+        if [ 0 -eq ${result} ]; then
+          echo "* Valid Windows Digital Signature for ${binary}"
+        else
+          echo "* !! Invalid Windows Digital Signature for ${binary}"
+        fi
+      ;;
+    esac
   fi
 done
 
@@ -174,6 +188,9 @@ export JAVA_OPTS="-Xmx512M"
 BASE_DIR="`pwd`/tarball"
 BASE_SOURCE_DIR="${BASE_DIR}/${BASE_FILE_NAME}-src"
 /bin/echo -e "base.path=${BASE_DIR}/downloads\nexecute.validate=true\nexecute.validate=true\njava.7.home=${JAVA_7_HOME}\nexecute.validate=false" > "${BASE_SOURCE_DIR}/build.properties"
+if [ "yes" != "${OPENSSL_HOME}" ] ; then
+  /bin/echo -e "\ntest.openssl.loc=${OPENSSL_HOME}/bin/openssl" >> "${BASE_SOURCE_DIR}/build.properties"
+fi
 JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 
 result=$?
@@ -209,7 +226,7 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   cd "${TCNATIVE_SOURCE_DIR}"
 
   echo "Building tcnative with OpenSSL ${OPENSSL_HOME}"
-  ./configure --with-apr=/usr/bin --with-ssl=${OPENSSL_HOME} --with-java-home="${TEST_JAVA_HOME}"
+  ./configure --with-apr=/usr/bin --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
   # /usr/lib/jvm/java-6-sun/
 
   result=$?
@@ -232,7 +249,10 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
     echo "* tcnative builds cleanly"
   fi
 
-  cp -d "${TCNATIVE_SOURCE_DIR}/.libs/"* "${BASE_SOURCE_DIR}/output/build/bin/native"
+  cp -aR "${TCNATIVE_SOURCE_DIR}/.libs/"* "${BASE_SOURCE_DIR}/output/build/bin/native"
+  if [ "yes" != "${OPENSSL_HOME}" ] ; then
+    cp -aR "${OPENSSL_HOME}/lib/"* "${BASE_SOURCE_DIR}/output/build/bin/native"
+  fi
 fi
 
 echo "Building Tomcat..."
