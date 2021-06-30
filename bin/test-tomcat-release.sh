@@ -92,7 +92,13 @@ for binary in ${BINARIES} ; do
   if [ -n "${OSSLSIGNCODE}" ] ; then
     case $binary in
       *.exe)
-        ${OSSLSIGNCODE} verify "$binary"  | grep -q 'Subject:.*Apache ' > /dev/null
+        ver=$( ${OSSLSIGNCODE} verify -CAfile /dev/null "$binary" )
+        result=$?
+        if [ 255 -eq $result ] ; then
+          ver=$( ${OSSLSIGNCODE} verify "$binary" )
+          result=$?
+        fi
+        echo $ver | grep -q 'Subject:.*Apache ' > /dev/null
         result=$?
         if [ 0 -eq ${result} ]; then
           echo "* Valid Windows Digital Signature for ${binary}"
@@ -125,7 +131,7 @@ for source in ${SOURCES} ; do
   fi
 
   # Check SHA-2 sum
-  sha512sum --status -c ${source}.sha512 > /dev/null 2>&1
+  shasum -a 512 --status -c ${source}.sha512 > /dev/null 2>&1
   result=$?
 
   if [ "$result" = "0" ] ; then
