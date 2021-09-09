@@ -239,7 +239,7 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   cd "${TCNATIVE_SOURCE_DIR}"
 
   echo "Building tcnative with OpenSSL ${OPENSSL_HOME}"
-  ./configure --with-apr=/usr/bin --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
+  ./configure --with-apr=$( which apr-1-config ) --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
   # /usr/lib/jvm/java-6-sun/
 
   result=$?
