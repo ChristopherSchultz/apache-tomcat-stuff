@@ -2,9 +2,9 @@
 #
 # mod_jk.py
 #
-# Contacts a mod_jk status page to get or set worker attributes.
+# Contacts a mod_jk status page to check on workers.
 #
-# Copyright (c) 2015 Christopher Schultz
+# Copyright (c) 2015-2022 Christopher Schultz
 #
 # Christopher Schultz licenses this file to You under the Apache License,
 # Version 2.0 (the "License"); you may not use this file except in
@@ -21,7 +21,7 @@
 
 import os
 import sys
-import getopt
+import argparse
 import ssl
 import urllib
 import urllib2
@@ -36,7 +36,16 @@ def read_config(filename, settings) :
             settings[values[0].strip()] = [ val.strip() for val in values[1].split(',') ]
 # END read_config()
 
-def status(servers, balancers, workers, attributes) :
+def status(servers, balancers, workers, attributes, options) :
+    status = 0
+
+    print_server = (1 < len(servers))
+    print_balancer = (1 != len(balancers))
+    print_worker = (1 != len(workers))
+
+    ok_msg = ""
+    warn_msg = ""
+    error_msg = ""
 
     for server in servers :
 
@@ -44,6 +53,7 @@ def status(servers, balancers, workers, attributes) :
 
         headers = { 'User-Agent' : 'mod_jk.py / Python-urllib',
                     'Connection' : 'close' }
+#        print 'Connecting to', url
         req = urllib2.Request(url, None, headers)
 
 
@@ -56,7 +66,7 @@ def status(servers, balancers, workers, attributes) :
 
         jk_version=root.find('{http://tomcat.apache.org}software').attrib['jk_version']
 
-        print('+ ' + server + ' (' + jk_version + ')')
+#        print('+ ' + server + ' (' + jk_version + ')')
 
         srv_balancers = { bal.attrib['name'] : { 'attrs' : bal.attrib, 'members' : { worker.attrib['name'] : worker.attrib for worker in bal.findall('{http://tomcat.apache.org}member') }  } for bal in root.find('{http://tomcat.apache.org}balancers').findall('{http://tomcat.apache.org}balancer')}
 
@@ -64,33 +74,82 @@ def status(servers, balancers, workers, attributes) :
         else : l_balancers = srv_balancers.keys()
 
         for balancer in l_balancers :
-
             if not balancer in srv_balancers:
-                print(" - " + balancer + " (not found in this server)")
-                continue
+                print "CRITICAL - balancer '" + balancer + "' was not found in server '" + server + "'"
+                exit(2)
 
-            print(" - " + balancer)
             members = srv_balancers[balancer]['members']
             if workers : l_workers = workers
             else : l_workers = members.keys()
 
             # Print Status
             for worker in l_workers :
-                print('   - ' + worker)
-                member = members[worker]
-                if not attributes : attributes = member.keys()
+                errmsg = ""
+                crit = warn = False
+                name = ""
+                if print_server : name += "server=" + server
+                if print_balancer :
+                    if name : name += ", "
+                    name += "balancer=" + balancer
+                if print_worker :
+                    if name : name += ", "
+                    name += "worker=" + worker
+                if name : name += ":"
 
-                for attr in attributes :
-                    if attr in member :
-                        print('       ' + attr + '=' + member[attr])
-                    else :
-                        print('       ' + attr + '=[unknown]')
+                member = members[worker]
+
+                if int(member['errors']) > 0 :
+                  status = max(status, 1)
+                  warn = True
+                  if errmsg: errmsg += ", "
+                  errmsg += "errors=" + member['errors']
+
+                if int(member['client_errors']) > 0 and not options['ignore_client_errors']:
+                  status = max(status, 1)
+                  warn = True
+                  if errmsg: errmsg += ", "
+                  errmsg += "client_errors=" + member['client_errors']
+
+                if int(member['busy']) > 100 :
+                  status = max(status, 1)
+                  warn = True
+                  if errmsg: errmsg += ", "
+                  errmsg += "busy=" + member['busy']
+
+                if member['state'] != 'OK' and member['state'] != 'OK/IDLE' :
+                  status = max(status, 1)
+                  warn = True
+                  if errmsg: errmsg += ", "
+                  errmsg += "state=" + member['state']
+
+                if member['activation'] == 'DIS' :
+                  status = max(status, 1)
+                  warn = True
+                  if errmsg: errmsg += ", "
+                  errmsg += "activation=" + member['activation']
+                elif member['activation'] == 'STO' :
+                  status = max(status, 2)
+                  crit = True
+                  if errmsg: errmsg += ", "
+                  errmsg += "activation=" + member['activation']
+
+                if crit :
+                    error_msg += ("\n" if error_msg else "") + "CRITICAL - " + name + errmsg
+                elif warn :
+                    warn_msg += ("\n" if warn_msg else "") + "WARNING - " + name + errmsg
+                else :
+                    ok_msg += ("\n" if ok_msg else "") + "OK - " + name
+                    for attribute in attributes:
+                      ok_msg += ', ' + attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")
+
+    print error_msg + ("\n" if error_msg and warn_msg else "") + warn_msg + ("\n" if (error_msg or warn_msg) and ok_msg else "") + ok_msg
+
+    exit(status)
 
 # END OF status()
 
 # Expecting a dictionary of 'attributes'
 def update(servers, balancers, workers, attributes) :
-
     for server in servers :
         print('+ Updating ' + server)
         url = protocol + server + jk_status_path;
@@ -131,17 +190,19 @@ def update(servers, balancers, workers, attributes) :
 
 # END OF update()
 
-def usage(script):
-  print(script + ' [options]')
-  print
-  print('Options:')
-  print('  -c file      Specify a file to configure this script')
-  print('  -s server    Specify a server to check/update')
-  print('  -b balancer  Specify a balancer to check/update')
-  print('  -w worker    Specify a server to check/update')
-  print('  -u key=value Update a balancer worker\'s settings')
-  print
-# END OF usage()
+# Merge items in 'items' into 'list'. If any item starts with '-' it is removed from 'list'.
+def merge(list, items):
+  #print "Merging",items,"into",list
+  if(items != None):
+    for item in items:
+      if(item[0] == '-'):
+        item=item[1:]
+        print "Possibly removing",item
+        if(item in list):
+          list.remove(item)
+      elif(not item in list):
+        list.append(item)
+# end of merge()
 
 #######################################
 # Main Program
@@ -151,8 +212,9 @@ def usage(script):
 
 jk_status_path='/jk-status'
 protocol = 'https://'
-confFile = os.path.dirname(sys.argv[0]) + '/mod_jk.conf'
+confFile = None
 attributes = []
+
 servers = [ ]
 balancers=[ ]
 workers = [ ]
@@ -184,86 +246,48 @@ attribute_value_map = {
 changes = {}
 settings = {}
 
-try:
-    opts, args = getopt.getopt(sys.argv[1:],
-                               'hc:s:b:w:a:u:c:',
-                               ['server=', 'balancer=', 'worker=', 'attribute=',
-                                'update',
-                                'config',
-                                ''])
-except getopt.GetoptError:
-    usage(sys.argv[0])
-    sys.exit(2)
+parser = argparse.ArgumentParser(description='Queries and possibly updates a mod_jk reverse-proxy server.')
 
-for opt, arg in opts:
-    if '--' == opt : break
-    if opt == '-h':
-        usage(sys.argv[0]);
-        sys.exit(0)
-    elif opt in ('-c', '--config'):
-        confFile = arg;
-    elif opt in ('-s', '--server'):
-        if arg[0] == '-':
-            arg = arg[1:]
-            if arg in servers:
-                servers.remove(arg)
-        else:
-            if not arg in servers:
-                servers.append(arg)
-    elif opt in ('-b', '--balancer'):
-        if arg[0] == '-':
-            arg = arg[1:]
-            if arg in balancers:
-                balancers.remove(arg)
-        else:
-            if not arg in balancers:
-                balancers.append(arg)
-    elif opt in ('-w', '--worker'):
-        if arg[0] == '-':
-            arg = arg[1:]
-            if arg in workers:
-                workers.remove(arg)
-        else:
-            if not arg in workers:
-                workers.append(arg)
-    elif opt in ('-a', '--attribute'):
-        if arg[0] == '+':
-            arg = arg[1:]
-            if not arg in attributes:
-                attributes.append(arg)
-        elif arg[0] == '-':
-            arg = arg[1:]
-            if arg in attributes:
-                attributes.remove(arg)
-        elif arg[0] == '=':
-            arg = arg[1:]
-            attributes = [ arg ]
-        else:
-            if not arg in attributes:
-                attributes.append(arg)
-    elif opt in ('-u', '--update'):
-        vals = [ val.strip() for val in arg.split('=') ]
-        changes.update({ vals[0] : vals[1] })
+parser.add_argument('-c', '--config', required=True, type=str, help='Configuration file for this script', metavar='config', default=os.path.dirname(sys.argv[0]) + '/mod_jk.conf')
+parser.add_argument('-s', '--server', type=str, help='The server to check or update', metavar='server', action='append')
+parser.add_argument('-b', '--balancer', type=str, help='The balancer to check or update', metavar='balancer', action='append')
+parser.add_argument('-w', '--worker', type=str, help='The worker to check or update', metavar='worker', action='append')
+parser.add_argument('-a', '--attribute', type=str, help='Attribute to be reported; can be specified multiple times; default: activation, state', metavar='attr', action='append')
+parser.add_argument('-u', '--update', type=str, help='Update an attribute; can be specifief multiple times', metavar='attr=value', action='append');
+parser.add_argument('--ignore-client-errors', action="store_true", help='Ignore client-errors on a worker')
+args = parser.parse_args()
+options = vars(args)
+#print(options)
 
+# Read config file first
+confFile=options['config']
 read_config(confFile, settings)
 
-if 'servers' in settings: servers = settings['servers']
-if 'balancers' in settings: balancers = settings['balancers']
-if 'workers' in settings: balancers = settings['workers']
-if not attributes:
-  if 'attributes' in settings: attributes = settings['attributes']
-  else : attributes = [ 'activation', 'state' ]
+# Allow command-line arguments to override anything
+merge(servers, options['server'])
+merge(balancers, options['balancer'])
+merge(workers, options['worker'])
+merge(attributes, options['attribute'])
+if(options['update'] != None):
+    for change in options['update']:
+        vals = [ val.strip() for val in change.split('=') ]
+        changes[vals[0]] = vals[1];
 
+# Use config file for defaults
+if not servers and 'servers' in settings: servers = settings['servers']
+if not balancers and 'balancers' in settings: balancers = settings['balancers']
+if not workers and 'workers' in settings: balancers = settings['workers']
+if not attributes and 'attributes' in settings: attributes = settings['attributes']
+if 'protocol' in settings : protocol = settings['protocol'][0]
+if 'jk_status_path' in settings : jk_status_path = settings['jk_status_path'][0]
 if 'username' in settings: username = settings['username'][0]
+if 'password' in settings: password = settings['password'][0]
 if 'skip_hostname_verification' in settings : skip_hostname_verification = (settings['skip_hostname_verification'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
 if 'ignore_cert_checks' in settings : ignore_cert_checks = (settings['ignore_cert_checks'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
-if 'password' in settings: password = settings['password'][0]
-if 'jk_status_path' in settings : jk_status_path = settings['jk_status_path'][0]
-if 'protocol' in settings : protocol = settings['protocol'][0]
 
 class IgnoreRedirectHandler(urllib2.HTTPRedirectHandler):
     def http_error_302(self, req, fp, code, msg, headers):
-        print "Ignoring redirect"
+        print 'Ignoring redirect to', headers['Location']
         infourl = urllib.addinfourl(fp, headers, req.get_full_url())
         infourl.status = status
         infourl.code = code
@@ -303,5 +327,5 @@ if auth_handler or host_handler :
 if changes:
   update(servers, balancers, workers, changes)
 
-status(servers, balancers, workers, attributes)
+status(servers, balancers, workers, attributes, options)
 
