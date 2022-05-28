@@ -134,13 +134,11 @@ def status(servers, balancers, workers, attributes, options) :
                   errmsg += "activation=" + member['activation']
 
                 if crit :
-                    error_msg += ("\n" if error_msg else "") + "CRITICAL - " + name + errmsg
+                    error_msg += ("\n" if error_msg else "") + "CRITICAL - " + name + errmsg + ', ' + ', '.join([ (attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")) for attribute in attributes])
                 elif warn :
-                    warn_msg += ("\n" if warn_msg else "") + "WARNING - " + name + errmsg
+                    warn_msg += ("\n" if warn_msg else "") + "WARNING - " + name + errmsg + ', ' + ', '.join([ (attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")) for attribute in attributes])
                 else :
-                    ok_msg += ("\n" if ok_msg else "") + "OK - " + name
-                    for attribute in attributes:
-                      ok_msg += ', ' + attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")
+                    ok_msg += ("\n" if ok_msg else "") + "OK - " + name + ', '.join([ (attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")) for attribute in attributes])
 
     print error_msg + ("\n" if error_msg and warn_msg else "") + warn_msg + ("\n" if (error_msg or warn_msg) and ok_msg else "") + ok_msg
 
