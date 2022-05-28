@@ -246,7 +246,7 @@ settings = {}
 
 parser = argparse.ArgumentParser(description='Queries and possibly updates a mod_jk reverse-proxy server.')
 
-parser.add_argument('-c', '--config', required=True, type=str, help='Configuration file for this script', metavar='config', default=os.path.dirname(sys.argv[0]) + '/mod_jk.conf')
+parser.add_argument('-c', '--config', type=str, help='Configuration file for this script', metavar='config', default=os.path.dirname(sys.argv[0]) + '/mod_jk.conf')
 parser.add_argument('-s', '--server', type=str, help='The server to check or update', metavar='server', action='append')
 parser.add_argument('-b', '--balancer', type=str, help='The balancer to check or update', metavar='balancer', action='append')
 parser.add_argument('-w', '--worker', type=str, help='The worker to check or update', metavar='worker', action='append')
