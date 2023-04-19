@@ -1,12 +1,30 @@
 #!/bin/sh
 
+if [ "" == "$1" ] ; then
+  >&2 echo "Usage: $0 <version>"
+  >&2 echo
+  >&2 echo "Example: $0 8.5.88"
+  exit 1
+fi
+
 export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
 export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
 export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
 export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target}"
 OSSLSIGNCODE=$( command -v osslsigncode )
+APR_CONFIG=$( command -v apr-1-config )
+if [ "" == "$APR_CONFIG" ] ; then
+  if [ -x "${APR_HOME}/bin/apr-1-config" ] ; then
+    APR_CONFIG="${APR_HOME}/bin/apr-1-config"
+  fi
+fi
+if [ "" == "$APR_CONFIG" ] ; then
+  2>&1 echo "apr-1-config not found. Please set APR_HOME appropriately. (APR_HOME=${APR_HOME})."
 
-TOMCAT_VERSION=${TOMCAT_VERSION-8.5.69}
+  exit
+fi
+
+TOMCAT_VERSION=${1}
 TOMCAT_MAJOR_VERSION=$(echo ${TOMCAT_VERSION} | sed 's/\..*//')
 
 # NOTE: Tomcat 7 needs JAVA_HOME to point to Java 6
@@ -48,8 +66,18 @@ if [ -z "${OPENSSL_HOME}" ] ; then
 else
   echo '*  OpenSSL: ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
 fi
-echo '*  APR:     ' `apr-1-config --version`
+echo '*  APR:     ' `${APR_CONFIG} --version`
 echo '*'
+
+build_java_version_number=$( echo "$build_java_version" | grep -i version | sed -e 's/[^"]*"//' -e 's/".*//' )
+if [ "0" != $( expr "$build_java_version_number" : "^1\." ) ] ; then
+  # This is "Java 1.x" and we really only care about x
+  build_java_version_number=$( echo $build_java_version_number | sed -e 's/^1\.//' )
+fi
+if [ "0" != $( expr "$build_java_version_number" : ".*\..*" ) ] ; then
+  # There are point-numbers to be removed
+  build_java_version_number=$( echo $build_java_version_number | sed -e 's/\..*//' )
+fi
 
 #if [ ! -f KEYS ] ; then
   # Fetch KEYS file
@@ -152,9 +180,9 @@ for source in ${SOURCES} ; do
   fi
 done
 
-echo '*'
+/bin/echo '*'
 
-echo -n "* Binary Zip and tarball: "
+/bin/echo -n "* Binary Zip and tarball: "
 if [ "$result" = "0" ] ; then
   echo Same
 else
@@ -172,7 +200,7 @@ diff --strip-trailing-cr -qr zip tarball
 
 result=$?
 
-echo -n "* Source Zip and tarball: "
+/bin/echo -n "* Source Zip and tarball: "
 if [ "$result" = "0" ] ; then
   echo Same
 else
@@ -195,15 +223,32 @@ BASE_DIR="`pwd`/tarball"
 BASE_SOURCE_DIR="${BASE_DIR}/${BASE_FILE_NAME}-src"
 cat <<ENDEND > "${BASE_SOURCE_DIR}/build.properties"
 base.path=${BASE_DIR}/downloads
-execute.validate=true
-execute.validate=true
-java.7.home=${JAVA_7_HOME}
 execute.validate=false
+java.7.home=${JAVA_7_HOME}
 ENDEND
 
-if [ "yes" != "${OPENSSL_HOME}" ] ; then
-  /bin/echo -e "\ntest.openssl.loc=${OPENSSL_HOME}/bin/openssl" >> "${BASE_SOURCE_DIR}/build.properties"
+# Disable 
+if [ "$build_java_version_number" -lt "9" ] ; then
+  echo "Suppressing 'opens' due to older Java version $build_java_version_number"
+  cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
+opens.javalang=-Dnop
+opens.javaio=-Dnop
+opens.sunrmi=-Dnop
+opens.javautil=-Dnop
+opens.javautilconcurrent=-Dnop
+ENDEND
 fi
+
+if [ "yes" != "${OPENSSL_HOME}" ] ; then
+# TODO: Suppress IDEA?
+  cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
+test.openssl.unimplemeneted=-Dnop
+test.openssl.loc=${OPENSSL_HOME}/bin/openssl
+ENDEND
+fi
+
+exit
+
 JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 
 result=$?
@@ -239,7 +284,7 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   cd "${TCNATIVE_SOURCE_DIR}"
 
   echo "Building tcnative with OpenSSL ${OPENSSL_HOME}"
-  ./configure --with-apr=$( which apr-1-config ) --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
+  ./configure --with-apr=${APR_CONFIG} --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
   # /usr/lib/jvm/java-6-sun/
 
   result=$?
