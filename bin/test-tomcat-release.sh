@@ -23,7 +23,7 @@ fi
 if [ "" == "$APR_CONFIG" ] ; then
   2>&1 echo "apr-1-config not found. Please set APR_HOME appropriately. (APR_HOME=${APR_HOME})."
 
-  exit
+  exit 1
 fi
 
 TOMCAT_VERSION=${1}
@@ -248,8 +248,6 @@ test.openssl.unimplemeneted=IDEA
 test.openssl.loc=${OPENSSL_HOME}/bin/openssl
 ENDEND
 fi
-
-exit
 
 JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 
