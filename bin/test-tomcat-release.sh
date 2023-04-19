@@ -223,11 +223,11 @@ BASE_DIR="`pwd`/tarball"
 BASE_SOURCE_DIR="${BASE_DIR}/${BASE_FILE_NAME}-src"
 cat <<ENDEND > "${BASE_SOURCE_DIR}/build.properties"
 base.path=${BASE_DIR}/downloads
-execute.validate=false
+execute.validate=true
 java.7.home=${JAVA_7_HOME}
 ENDEND
 
-# Disable 
+# Disable 'opens' on older Java versions.
 if [ "$build_java_version_number" -lt "9" ] ; then
   echo "Suppressing 'opens' due to older Java version $build_java_version_number"
   cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
@@ -240,9 +240,9 @@ ENDEND
 fi
 
 if [ "yes" != "${OPENSSL_HOME}" ] ; then
-# TODO: Suppress IDEA?
+  echo "Suppressing IDEA tests via OpenSSL"
   cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
-test.openssl.unimplemeneted=-Dnop
+test.openssl.unimplemeneted=IDEA
 test.openssl.loc=${OPENSSL_HOME}/bin/openssl
 ENDEND
 fi
