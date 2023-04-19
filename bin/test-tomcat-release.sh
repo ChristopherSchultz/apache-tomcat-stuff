@@ -12,6 +12,8 @@ export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
 export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
 export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target}"
 OSSLSIGNCODE=$( command -v osslsigncode )
+OSSLSIGNCODE_OPTS="${OSSLSIGNCODE_OPTS:--CAfile /etc/ssl/certs/ca-certificates.crt -untrusted /etc/ssl/certs/ca-certificates.crt}"
+
 APR_CONFIG=$( command -v apr-1-config )
 if [ "" == "$APR_CONFIG" ] ; then
   if [ -x "${APR_HOME}/bin/apr-1-config" ] ; then
@@ -120,7 +122,7 @@ for binary in ${BINARIES} ; do
   if [ -n "${OSSLSIGNCODE}" ] ; then
     case $binary in
       *.exe)
-        ver=$( ${OSSLSIGNCODE} verify -CAfile /dev/null "$binary" )
+        ver=$( ${OSSLSIGNCODE} verify ${OSSLSIGNCODE_OPTS} "$binary" )
         result=$?
         if [ 255 -eq $result ] ; then
           ver=$( ${OSSLSIGNCODE} verify "$binary" )
