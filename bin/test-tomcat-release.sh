@@ -62,19 +62,19 @@ SOURCES="${SRC_ZIPFILE} ${SRC_TARBALL}"
 echo '* Environment'
 build_java_version=`${BUILD_JAVA_HOME}/bin/java -version 2>&1`
 test_java_version=`${TEST_JAVA_HOME}/bin/java -version 2>&1`
-echo '*  Java (build):    ' $build_java_version
+echo '*  Java (build):   ' $build_java_version
 echo '*  Java (test):    ' $test_java_version
-echo '*  OS:      ' `uname -mrs`
-echo '*  cc:      ' `cc --version | head -n 1`
-echo '*  make:    ' `make --version | head -n 1`
+echo '*  OS:             ' `uname -mrs`
+echo '*  cc:             ' `cc --version | head -n 1`
+echo '*  make:           ' `make --version | head -n 1`
 if [ -z "${OPENSSL_HOME}" ] ; then
   echo '*  OpenSSL: ' `openssl version`
   # Set OPENSSL_HOME=yes to use system-installed openssl version
   OPENSSL_HOME=yes
 else
-  echo '*  OpenSSL: ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
+  echo '*  OpenSSL:      ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
 fi
-echo '*  APR:     ' `${APR_CONFIG} --version`
+echo '*  APR:            ' `${APR_CONFIG} --version`
 echo '*'
 
 build_java_version_number=$( echo "$build_java_version" | grep -i version | sed -e 's/[^"]*"//' -e 's/".*//' )
@@ -100,9 +100,24 @@ for binary in ${BINARIES} ; do
 
   if [ ! -f "${binary}" ] ; then
     echo "Downloading ${BASE_BINARY_URL}/${binary}..."
-    curl -\#O "${BASE_BINARY_URL}/${binary}"
-    curl -\#O "${BASE_BINARY_URL}/${binary}.asc"
-    curl -\#O "${BASE_BINARY_URL}/${binary}.sha512"
+    curl -f -\#O "${BASE_BINARY_URL}/${binary}" 2>&1
+    if [ "0" != "$?" ] ; then
+      1>&2 echo Failed to download ${BASE_BINARY_URL}/${binary}
+
+      exit 1
+    fi
+    curl -f -\#O "${BASE_BINARY_URL}/${binary}.asc" 2>&1
+    if [ "0" != "$?" ] ; then
+      1>&2 echo Failed to download ${BASE_BINARY_URL}/${binary}.asc
+
+      exit 1
+    fi
+    curl -f -\#O "${BASE_BINARY_URL}/${binary}.sha512" 2>&1
+    if [ "0" != "$?" ] ; then
+      1>&2 echo Failed to download ${BASE_BINARY_URL}/${binary}.sha512
+
+      exit 1
+    fi
   fi
 
   # Check SHA-2 sum
@@ -113,6 +128,7 @@ for binary in ${BINARIES} ; do
     echo "* Valid SHA-512 signature for ${binary}"
   else
     echo "* !! Invalid SHA-512 signature for ${binary}"
+#echo Ran command "\"shasum -a 512 --status -bc ${binary}.sha512 > /dev/null 2>&1\""
   fi
 
   # Check GPG Signatures
@@ -161,9 +177,24 @@ for source in ${SOURCES} ; do
 
   if [ ! -f "${source}" ] ; then
     echo "Downloading ${source}..."
-    curl -\#O "${BASE_SOURCE_URL}/${source}"
-    curl -\#O "${BASE_SOURCE_URL}/${source}.asc"
-    curl -\#O "${BASE_SOURCE_URL}/${source}.sha512"
+    curl -f -\#O "${BASE_SOURCE_URL}/${source}" 2>&1
+    if [ "0" != "$?" ] ; then
+      1>&2 echo Failed to download ${BASE_SOURCE_URL}/${source}
+
+      exit 1
+    fi
+    curl -f -\#O "${BASE_SOURCE_URL}/${source}.asc" 2>&1
+    if [ "0" != "$?" ] ; then
+      1>&2 echo Failed to download ${BASE_SOURCE_URL}/${source}.asc
+
+      exit 1
+    fi
+    curl -f -\#O "${BASE_SOURCE_URL}/${source}.sha512" 2>&1
+    if [ "0" != "$?" ] ; then
+      1>&2 echo Failed to download ${BASE_SOURCE_URL}/${source}.sha256
+
+      exit 1
+    fi
   fi
 
   # Check SHA-2 sum
@@ -255,6 +286,8 @@ test.openssl.loc=${OPENSSL_HOME}/bin/openssl
 ENDEND
 fi
 
+echo "Downloading stuff..."
+echo JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 
 result=$?
