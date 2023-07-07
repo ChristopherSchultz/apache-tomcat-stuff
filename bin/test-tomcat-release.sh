@@ -1,10 +1,16 @@
 #!/bin/sh
 
-if [ "" == "$1" ] ; then
+if [ "" = "$1" ] ; then
   >&2 echo "Usage: $0 <version>"
   >&2 echo
   >&2 echo "Example: $0 8.5.88"
   exit 1
+fi
+if [ \( "-h" = "$1" \) -o \( "--help" = "$1" \) ] ; then
+  echo "Usage: $0 <version>"
+  echo
+  echo "Example: $0 8.5.88"
+  exit 0
 fi
 
 export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
