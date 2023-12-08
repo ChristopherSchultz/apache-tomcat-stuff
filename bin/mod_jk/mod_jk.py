@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # mod_jk.py
 #
@@ -23,8 +23,7 @@ import os
 import sys
 import argparse
 import ssl
-import urllib
-import urllib2
+import requests
 import xml.etree.ElementTree as ET
 
 def read_config(filename, settings) :
@@ -51,34 +50,35 @@ def status(servers, balancers, workers, attributes, options) :
 
         url = protocol + server + jk_status_path + '?mime=xml'
 
-        headers = { 'User-Agent' : 'mod_jk.py / Python-urllib',
+        headers = { 'User-Agent' : 'mod_jk.py / Python-requests',
                     'Connection' : 'close' }
-#        print 'Connecting to', url
-        req = urllib2.Request(url, None, headers)
+#        print('Connecting to', url)
+        response = requests.get(url, headers=headers, auth=auth, verify=verify_certs)
+        html = response.text
 
-
-        response = urllib2.urlopen(req)
-        html = response.read()
-
-#        print(html)
+        #print(html)
 
         root = ET.fromstring(html)
 
         jk_version=root.find('{http://tomcat.apache.org}software').attrib['jk_version']
 
-#        print('+ ' + server + ' (' + jk_version + ')')
+        print('+ ' + server + ' (' + jk_version + ')')
 
         srv_balancers = { bal.attrib['name'] : { 'attrs' : bal.attrib, 'members' : { worker.attrib['name'] : worker.attrib for worker in bal.findall('{http://tomcat.apache.org}member') }  } for bal in root.find('{http://tomcat.apache.org}balancers').findall('{http://tomcat.apache.org}balancer')}
 
+        # print("I got balancer member data: " + str(srv_balancers))
         if balancers : l_balancers = balancers
         else : l_balancers = srv_balancers.keys()
 
         for balancer in l_balancers :
             if not balancer in srv_balancers:
-                print "CRITICAL - balancer '" + balancer + "' was not found in server '" + server + "'"
+                print("CRITICAL - balancer '" + balancer + "' was not found in server '" + server + "'")
                 exit(2)
 
             members = srv_balancers[balancer]['members']
+
+            #print("I got members: " + str(members))
+
             if workers : l_workers = workers
             else : l_workers = members.keys()
 
@@ -98,17 +98,19 @@ def status(servers, balancers, workers, attributes, options) :
 
                 member = members[worker]
 
+                #print("worker " + worker + " in balancer " + balancer + " has state=" + member['state'] + " and activation=" + member['activation'] + ", attributes=" + str(attributes))
+
                 if int(member['errors']) > 0 :
                   status = max(status, 1)
                   warn = True
                   if errmsg: errmsg += ", "
                   errmsg += "errors=" + member['errors']
 
-                if int(member['client_errors']) > 0 and not options['ignore_client_errors']:
-                  status = max(status, 1)
-                  warn = True
-                  if errmsg: errmsg += ", "
-                  errmsg += "client_errors=" + member['client_errors']
+                #if int(member['client_errors']) > 0 and not options['ignore_client_errors']:
+                  #status = max(status, 1)
+                  #warn = True
+                  #if errmsg: errmsg += ", "
+                  #errmsg += "client_errors=" + member['client_errors']
 
                 if int(member['busy']) > 100 :
                   status = max(status, 1)
@@ -133,14 +135,15 @@ def status(servers, balancers, workers, attributes, options) :
                   if errmsg: errmsg += ", "
                   errmsg += "activation=" + member['activation']
 
+                #print("member=" + member)
                 if crit :
-                    error_msg += ("\n" if error_msg else "") + "CRITICAL - " + name + errmsg + ', ' + ', '.join([ (attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")) for attribute in attributes])
+                    error_msg += ("\n" if error_msg else "") + "CRITICAL - " + name + errmsg + ', ' + ', '.join([ (attribute + '=' + (member[attribute] if attribute in member else "?")) for attribute in attributes])
                 elif warn :
-                    warn_msg += ("\n" if warn_msg else "") + "WARNING - " + name + errmsg + ', ' + ', '.join([ (attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")) for attribute in attributes])
+                    warn_msg += ("\n" if warn_msg else "") + "WARNING - " + name + errmsg + ', ' + ', '.join([ (attribute + '=' + (member[attribute] if attribute in member else "?")) for attribute in attributes])
                 else :
-                    ok_msg += ("\n" if ok_msg else "") + "OK - " + name + ', '.join([ (attribute + '=' + (member[attribute] if member.has_key(attribute) else "?")) for attribute in attributes])
+                    ok_msg += ("\n" if ok_msg else "") + "OK - " + name + ', '.join([ (attribute + '=' + (member[attribute] if attribute in member else "?")) for attribute in attributes])
 
-    print error_msg + ("\n" if error_msg and warn_msg else "") + warn_msg + ("\n" if (error_msg or warn_msg) and ok_msg else "") + ok_msg
+    print(error_msg + ("\n" if error_msg and warn_msg else "") + warn_msg + ("\n" if (error_msg or warn_msg) and ok_msg else "") + ok_msg)
 
     exit(status)
 
@@ -152,7 +155,7 @@ def update(servers, balancers, workers, attributes) :
         print('+ Updating ' + server)
         url = protocol + server + jk_status_path;
 
-        headers = { 'User-Agent' : 'mod_jk.py / Python-urllib',
+        headers = { 'User-Agent' : 'mod_jk.py / Python-requests',
                     'Connection' : 'keepalive' }
 
         if not balancers:
@@ -171,7 +174,7 @@ def update(servers, balancers, workers, attributes) :
                          'sw' : worker }
 
                 # vwa is 'activation' and 0 means 'ACTIVE'
-                for ( key, val ) in attributes.iteritems():
+                for ( key, val ) in attributes.items():
                     if key in attribute_map:
                         if key in attribute_value_map:
                             postdata[attribute_map[key]] = attribute_value_map[key][val]
@@ -180,11 +183,10 @@ def update(servers, balancers, workers, attributes) :
                     else:
                         postdata[key] = val;
 
-                data = urllib.urlencode(postdata)
+                response = requests.get(url, params=postdata, headers=headers, auth=auth, verify=verify_certs, allow_redirects=False)
 
-                req = urllib2.Request(url + '?' + data, None, headers)
-
-                response = urllib2.urlopen(req)
+                #print("response code=" + str(response.status_code))
+                #print("response text=" + response.text)
 
 # END OF update()
 
@@ -195,7 +197,7 @@ def merge(list, items):
     for item in items:
       if(item[0] == '-'):
         item=item[1:]
-        print "Possibly removing",item
+        print("Possibly removing",item)
         if(item in list):
           list.remove(item)
       elif(not item in list):
@@ -283,44 +285,21 @@ if 'password' in settings: password = settings['password'][0]
 if 'skip_hostname_verification' in settings : skip_hostname_verification = (settings['skip_hostname_verification'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
 if 'ignore_cert_checks' in settings : ignore_cert_checks = (settings['ignore_cert_checks'][0] in ('true', 'True', 'yes', 'Yes', '1', 'on', 'On'))
 
-class IgnoreRedirectHandler(urllib2.HTTPRedirectHandler):
-    def http_error_302(self, req, fp, code, msg, headers):
-        print 'Ignoring redirect to', headers['Location']
-        infourl = urllib.addinfourl(fp, headers, req.get_full_url())
-        infourl.status = status
-        infourl.code = code
-        return infourl
-    http_error_301 = http_error_303 = http_error_307 = http_error_302
-
-redirect_ignorer = IgnoreRedirectHandler()
-
 if username and password :
     server_urls = [protocol + host for host in servers]
 
-    password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
-
-    [password_mgr.add_password(None, url, username, password) for url in server_urls]
-
-    auth_handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+    auth = (username, password)
 else :
-    auth_handler = None
+    auth = None
 
 ctx = ssl.create_default_context()
 
 if skip_hostname_verification :
     ctx.check_hostname = False
 if ignore_cert_checks :
-    ctx.verify_mode = ssl.CERT_NONE
-
-host_handler = urllib2.HTTPSHandler(0, context=ctx)
-
-if auth_handler or host_handler :
-    if auth_handler and host_handler :
-        urllib2.install_opener(urllib2.build_opener(redirect_ignorer, auth_handler, host_handler))
-    elif auth_handler :
-        urllib2.install_opener(urllib2.build_opener(redirect_ignorer, auth_handler))
-    elif host_handler :
-        urllib2.install_opener(urllib2.build_opener(redirect_ignorer, host_handler))
+    verify_certs=False
+else :
+    verify_certs=True
 
 if changes:
   update(servers, balancers, workers, changes)
