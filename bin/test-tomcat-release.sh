@@ -1,16 +1,40 @@
 #!/bin/sh
 
+TOMCAT_VERSION=
+RELEASE_TYPE=archive
+CLEAN=false
+for arg in "$@" ; do
+  case $arg in
+    -c) CLEAN=true
+        shift
+        ;;
+
+    -d) RELEASE_TYPE=dev
+        shift
+        ;;
+
+    -h|--help) echo "Usage: $0 [-c] [-d] <version>"
+        echo
+        echo "  -c Clean-up any existing apache-tomcat-[version] files and re-download them."
+        echo "  -d Download a development / release-candidate version for testing."
+        echo
+        echo "Example: $0 8.5.98"
+        exit 0
+        ;;
+
+     *) break
+        ;;
+  esac
+done
+
 if [ "" = "$1" ] ; then
-  >&2 echo "Usage: $0 <version>"
+  >&2 echo "Usage: $0 [-c] [-d] <version>"
+  >&2 echo
+  >&2 echo "  -c Clean-up any existing apache-tomcat-[version] files and re-download them."
+  >&2 echo "  -d Download a development / release-candidate version for testing."
   >&2 echo
   >&2 echo "Example: $0 8.5.88"
   exit 1
-fi
-if [ \( "-h" = "$1" \) -o \( "--help" = "$1" \) ] ; then
-  echo "Usage: $0 <version>"
-  echo
-  echo "Example: $0 8.5.88"
-  exit 0
 fi
 
 export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
@@ -35,6 +59,10 @@ fi
 TOMCAT_VERSION=${1}
 TOMCAT_MAJOR_VERSION=$(echo ${TOMCAT_VERSION} | sed 's/\..*//')
 
+if [ "${CLEAN}" = "true" ] ; then
+  rm "apache-tomcat-${TOMCAT_VERSION}".*
+fi
+
 # NOTE: Tomcat 7 needs JAVA_HOME to point to Java 6
 if [ "7" = "$TOMCAT_MAJOR_VERSION" ] ; then
   JAVA_HOME="${JAVA_HOME:-$JAVA_6_HOME}"
@@ -46,7 +74,12 @@ export TEST_JAVA_HOME="${TEST_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_JAVA_HOME="${BUILD_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_NATIVE_JAVA_HOME="${BUILD_NATIVE_JAVA_HOME:-$JAVA_HOME}"
 
-BASE_URL="https://dist.apache.org/repos/dist/dev/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_VERSION}"
+if [ "dev" = "${RELEASE_TYPE}" ] ; then
+  BASE_URL="https://dist.apache.org/repos/dist/dev/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_VERSION}"
+else
+  BASE_URL="https://archive.apache.org/dist/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_VERSION}"
+fi
+
 BASE_BINARY_URL="${BASE_URL}/bin"
 BASE_SOURCE_URL="${BASE_URL}/src"
 BASE_FILE_NAME="apache-tomcat-${TOMCAT_VERSION}"
@@ -103,6 +136,12 @@ for binary in ${BINARIES} ; do
     curl -f -\#O "${BASE_BINARY_URL}/${binary}" 2>&1
     if [ "0" != "$?" ] ; then
       1>&2 echo Failed to download ${BASE_BINARY_URL}/${binary}
+      1>&2 echo
+      if [ "dev" = "${RELEASE_TYPE}" ] ; then
+        1>&2 echo "Perhaps you should not use the -d (development) switch for an already-released version?"
+      else
+        1>&2 echo "Perhaps you need to specify -d (development) to download a release for voting?"
+      fi
 
       exit 1
     fi
@@ -367,7 +406,7 @@ fi
 #exit
 
 echo Running all tests...
-JAVA_HOME=$TEST_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" test
+JAVA_HOME=$TEST_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" -Dexecute.validate=false test
 
 grep "\(Failures\|Errors\): [^0]" "${BASE_SOURCE_DIR}/output/build/logs/"TEST*.txt
 result=$?
