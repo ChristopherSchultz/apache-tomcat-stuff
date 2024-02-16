@@ -120,6 +120,9 @@ if [ "0" != $( expr "$build_java_version_number" : ".*\..*" ) ] ; then
   build_java_version_number=$( echo $build_java_version_number | sed -e 's/\..*//' )
 fi
 
+# Get rid of anything that isn't a number (e.g. -ea)
+build_java_version_number=$( echo $build_java_version_number | sed -e 's/[^0-9]//g' )
+
 #if [ ! -f KEYS ] ; then
   # Fetch KEYS file
   echo "Downloading KEYS from ${BASE_URL}/KEYS..."
@@ -322,6 +325,12 @@ if [ "yes" != "${OPENSSL_HOME}" ] ; then
   cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
 test.openssl.unimplemeneted=IDEA
 test.openssl.loc=${OPENSSL_HOME}/bin/openssl
+ENDEND
+fi
+
+if [ "$APR_HOME" != "" ] ; then
+  cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
+test.apr.loc=${BASE_SOURCE_DIR}/output/build/bin/native
 ENDEND
 fi
 
