@@ -95,8 +95,10 @@ SOURCES="${SRC_ZIPFILE} ${SRC_TARBALL}"
 echo '* Environment'
 build_java_version=`${BUILD_JAVA_HOME}/bin/java -version 2>&1`
 test_java_version=`${TEST_JAVA_HOME}/bin/java -version 2>&1`
+ant_version=`"${ANT_HOME}/bin/ant" -version`
 echo '*  Java (build):   ' $build_java_version
 echo '*  Java (test):    ' $test_java_version
+echo '*  Ant:            ' $ant_version
 echo '*  OS:             ' `uname -mrs`
 echo '*  cc:             ' `cc --version | head -n 1`
 echo '*  make:           ' `make --version | head -n 1`
@@ -335,8 +337,8 @@ ENDEND
 fi
 
 echo "Downloading stuff..."
-echo JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
-JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
+echo JAVA_HOME=$BUILD_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
+JAVA_HOME=$BUILD_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" download-compile download-test-compile download-dist
 
 result=$?
 echo "* Building dependencies returned: $result"
@@ -401,7 +403,7 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
 fi
 
 echo "Building Tomcat..."
-JAVA_HOME=$BUILD_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" deploy
+JAVA_HOME=$BUILD_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" deploy
 
 result=$?
 if [ "0" != "$result" ] ; then
@@ -415,7 +417,7 @@ fi
 #exit
 
 echo Running all tests...
-JAVA_HOME=$TEST_JAVA_HOME ant -f "${BASE_SOURCE_DIR}/build.xml" -Dexecute.validate=false test
+JAVA_HOME=$TEST_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" -Dexecute.validate=false test
 
 grep "\(Failures\|Errors\): [^0]" "${BASE_SOURCE_DIR}/output/build/logs/"TEST*.txt
 result=$?
