@@ -4,7 +4,7 @@
 #
 # Contacts a mod_jk status page to check on workers.
 #
-# Copyright (c) 2015-2022 Christopher Schultz
+# Copyright (c) 2015-2024 Christopher Schultz
 #
 # Christopher Schultz licenses this file to You under the Apache License,
 # Version 2.0 (the "License"); you may not use this file except in
