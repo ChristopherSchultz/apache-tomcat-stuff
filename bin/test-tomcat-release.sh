@@ -103,11 +103,11 @@ echo '*  OS:             ' `uname -mrs`
 echo '*  cc:             ' `cc --version | head -n 1`
 echo '*  make:           ' `make --version | head -n 1`
 if [ -z "${OPENSSL_HOME}" ] ; then
-  echo '*  OpenSSL: ' `openssl version`
+  echo '*  OpenSSL:        ' `openssl version`
   # Set OPENSSL_HOME=yes to use system-installed openssl version
   OPENSSL_HOME=yes
 else
-  echo '*  OpenSSL:      ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
+  echo '*  OpenSSL:        ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
 fi
 echo '*  APR:            ' `${APR_CONFIG} --version`
 echo '*'
@@ -348,6 +348,19 @@ if [ "0" != "$result" ] ; then
   exit
 fi
 
+echo "Building Tomcat..."
+echo "Performing release build minus signatures, which should not be necessary."
+
+JAVA_HOME=$BUILD_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" -Dgpg.exec.available=false release
+
+result=$?
+if [ "0" != "$result" ] ; then
+  echo "* !! Tomcat failed to build (result=$result). Quitting"
+  exit
+else
+  echo "* Tomcat builds cleanly"
+fi
+
 if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   echo Building tcnative...
   mkdir -p "${BASE_SOURCE_DIR}/output/build/bin/native"
@@ -400,17 +413,6 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   if [ "yes" != "${OPENSSL_HOME}" ] ; then
     cp -aR "${OPENSSL_HOME}/lib/"* "${BASE_SOURCE_DIR}/output/build/bin/native"
   fi
-fi
-
-echo "Building Tomcat..."
-JAVA_HOME=$BUILD_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" deploy
-
-result=$?
-if [ "0" != "$result" ] ; then
-  echo "* !! Tomcat failed to build (result=$result). Quitting"
-  exit
-else
-  echo "* Tomcat builds cleanly"
 fi
 
 #echo NOT RUNNING UNIT TESTS
