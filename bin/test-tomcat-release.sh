@@ -95,8 +95,16 @@ SOURCES="${SRC_ZIPFILE} ${SRC_TARBALL}"
 echo '* Environment'
 build_java_version=`${BUILD_JAVA_HOME}/bin/java -version 2>&1`
 test_java_version=`${TEST_JAVA_HOME}/bin/java -version 2>&1`
+if [ "x" != "x${JAVA_FFM_HOME}" ] ; then
+  ffm_java_version=$( ${JAVA_FFM_HOME}/bin/java -version 2>&1 )
+else
+  ffm_java_version=
+fi
 ant_version=`"${ANT_HOME}/bin/ant" -version`
 echo '*  Java (build):   ' $build_java_version
+if [ "x" != "x${ffm_java_version}" ] ; then
+  echo '*  Java (ffm):     ' $ffm_java_version
+fi
 echo '*  Java (test):    ' $test_java_version
 echo '*  Ant:            ' $ant_version
 echo '*  OS:             ' `uname -mrs`
@@ -177,7 +185,7 @@ for binary in ${BINARIES} ; do
 
   # Check GPG Signatures
   #echo -n "GPG verify ($binary): "
-  gpg --keyring ./apache-keys --no-default-keyring --verify ${binary}.asc ${binary} > /dev/null 2>&1
+  gpg --keyring ./apache-keys --no-default-keyring --trust-model always --verify ${binary}.asc ${binary} > /dev/null 2>&1
   result=$?
 
   if [ "$result" = "0" ] ; then
@@ -308,6 +316,11 @@ cat <<ENDEND > "${BASE_SOURCE_DIR}/build.properties"
 base.path=${BASE_DIR}/downloads
 execute.validate=true
 java.7.home=${JAVA_7_HOME}
+nsis.tool=makensis
+# TODO: This is specifically for MacOS
+openssl.ffm.1=-Dorg.apache.tomcat.util.openssl.USE_SYSTEM_LOAD_LIBRARY=true
+openssl.ffm.2=-Dorg.apache.tomcat.util.openssl.LIBRARY_NAME=ssl
+java-ffm.home=${JAVA_FFM_HOME}
 ENDEND
 
 # Disable 'opens' on older Java versions.
