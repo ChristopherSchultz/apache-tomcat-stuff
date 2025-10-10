@@ -431,8 +431,10 @@ fi
 #echo NOT RUNNING UNIT TESTS
 #exit
 
+CAFFEINATE=$( command -v caffeinate )
+
 echo Running all tests...
-JAVA_HOME=$TEST_JAVA_HOME "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" -Dexecute.validate=false test
+JAVA_HOME=$TEST_JAVA_HOME $CAFFEINATE "${ANT_HOME}/bin/ant" -f "${BASE_SOURCE_DIR}/build.xml" -Dexecute.validate=false test
 
 grep "\(Failures\|Errors\): [^0]" "${BASE_SOURCE_DIR}/output/build/logs/"TEST*.txt
 result=$?
