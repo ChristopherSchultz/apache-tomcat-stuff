@@ -37,25 +37,6 @@ if [ "" = "$1" ] ; then
   exit 1
 fi
 
-export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
-export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
-export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
-export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target}"
-OSSLSIGNCODE=$( command -v osslsigncode )
-OSSLSIGNCODE_OPTS="${OSSLSIGNCODE_OPTS:--CAfile /etc/ssl/certs/ca-certificates.crt -untrusted /etc/ssl/certs/ca-certificates.crt}"
-
-APR_CONFIG=$( command -v apr-1-config )
-if [ "" == "$APR_CONFIG" ] ; then
-  if [ -x "${APR_HOME}/bin/apr-1-config" ] ; then
-    APR_CONFIG="${APR_HOME}/bin/apr-1-config"
-  fi
-fi
-if [ "" == "$APR_CONFIG" ] ; then
-  2>&1 echo "apr-1-config not found. Please set APR_HOME appropriately. (APR_HOME=${APR_HOME})."
-
-  exit 1
-fi
-
 TOMCAT_VERSION=${1}
 TOMCAT_MAJOR_VERSION=$(echo ${TOMCAT_VERSION} | sed 's/\..*//')
 
@@ -63,6 +44,16 @@ if [ "${CLEAN}" = "true" ] ; then
   rm "apache-tomcat-${TOMCAT_VERSION}".*
 fi
 
+##
+## Environment Setup and Validation
+##
+
+# Set default Java paths if not already set
+export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
+export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
+export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
+
+# Determine which Java version to use based on Tomcat version
 # NOTE: Tomcat 7 needs JAVA_HOME to point to Java 6
 if [ "7" = "$TOMCAT_MAJOR_VERSION" ] ; then
   JAVA_HOME="${JAVA_HOME:-$JAVA_6_HOME}"
@@ -73,6 +64,65 @@ fi
 export TEST_JAVA_HOME="${TEST_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_JAVA_HOME="${BUILD_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_NATIVE_JAVA_HOME="${BUILD_NATIVE_JAVA_HOME:-$JAVA_HOME}"
+
+# Validate BUILD_JAVA_HOME
+if [ ! -d "${BUILD_JAVA_HOME}" ] || [ ! -x "${BUILD_JAVA_HOME}/bin/java" ] ; then
+  >&2 echo "ERROR: BUILD_JAVA_HOME is not a valid Java installation: ${BUILD_JAVA_HOME}"
+  >&2 echo "Please set BUILD_JAVA_HOME to a valid Java installation."
+  exit 1
+fi
+
+# Validate TEST_JAVA_HOME
+if [ ! -d "${TEST_JAVA_HOME}" ] || [ ! -x "${TEST_JAVA_HOME}/bin/java" ] ; then
+  >&2 echo "ERROR: TEST_JAVA_HOME is not a valid Java installation: ${TEST_JAVA_HOME}"
+  >&2 echo "Please set TEST_JAVA_HOME to a valid Java installation."
+  exit 1
+fi
+
+# Validate BUILD_NATIVE_JAVA_HOME
+if [ ! -d "${BUILD_NATIVE_JAVA_HOME}" ] || [ ! -x "${BUILD_NATIVE_JAVA_HOME}/bin/java" ] ; then
+  >&2 echo "ERROR: BUILD_NATIVE_JAVA_HOME is not a valid Java installation: ${BUILD_NATIVE_JAVA_HOME}"
+  >&2 echo "Please set BUILD_NATIVE_JAVA_HOME to a valid Java installation."
+  exit 1
+fi
+
+# Validate ANT_HOME
+if [ -z "${ANT_HOME}" ] || [ ! -d "${ANT_HOME}" ] || [ ! -x "${ANT_HOME}/bin/ant" ] ; then
+  >&2 echo "ERROR: ANT_HOME is not a valid Apache Ant installation: ${ANT_HOME}"
+  >&2 echo "Please set ANT_HOME to your Apache Ant installation directory."
+  exit 1
+fi
+
+# Set up OpenSSL
+# Set default only if not already set
+export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target}"
+
+# If OPENSSL_HOME is set but doesn't exist, try to use system OpenSSL
+if [ ! -z "${OPENSSL_HOME}" ] && [ "yes" != "${OPENSSL_HOME}" ] ; then
+  if [ ! -d "${OPENSSL_HOME}" ] || [ ! -x "${OPENSSL_HOME}/bin/openssl" ] ; then
+    >&2 echo "WARNING: OPENSSL_HOME does not exist or is invalid: ${OPENSSL_HOME}"
+    >&2 echo "Attempting to use system-installed OpenSSL instead."
+    OPENSSL_HOME=yes
+  fi
+fi
+
+# Set up APR
+APR_CONFIG=$( command -v apr-1-config )
+if [ "" == "$APR_CONFIG" ] ; then
+  if [ -n "${APR_HOME}" ] && [ -x "${APR_HOME}/bin/apr-1-config" ] ; then
+    APR_CONFIG="${APR_HOME}/bin/apr-1-config"
+  fi
+fi
+if [ "" == "$APR_CONFIG" ] ; then
+  >&2 echo "ERROR: apr-1-config not found in PATH or APR_HOME."
+  >&2 echo "Please install APR development tools or set APR_HOME appropriately."
+  >&2 echo "(APR_HOME=${APR_HOME})"
+  exit 1
+fi
+
+# Set up optional osslsigncode for Windows executable verification
+OSSLSIGNCODE=$( command -v osslsigncode )
+OSSLSIGNCODE_OPTS="${OSSLSIGNCODE_OPTS:--CAfile /etc/ssl/certs/ca-certificates.crt -untrusted /etc/ssl/certs/ca-certificates.crt}"
 
 if [ "dev" = "${RELEASE_TYPE}" ] ; then
   BASE_URL="https://dist.apache.org/repos/dist/dev/tomcat/tomcat-${TOMCAT_MAJOR_VERSION}/v${TOMCAT_VERSION}"
@@ -110,10 +160,8 @@ echo '*  Ant:            ' $ant_version
 echo '*  OS:             ' `uname -mrs`
 echo '*  cc:             ' `cc --version | head -n 1`
 echo '*  make:           ' `make --version | head -n 1`
-if [ -z "${OPENSSL_HOME}" ] ; then
+if [ "yes" = "${OPENSSL_HOME}" ] ; then
   echo '*  OpenSSL:        ' `openssl version`
-  # Set OPENSSL_HOME=yes to use system-installed openssl version
-  OPENSSL_HOME=yes
 else
   echo '*  OpenSSL:        ' `LD_LIBRARY_PATH="${OPENSSL_HOME}/lib" "${OPENSSL_HOME}"/bin/openssl version`
 fi
@@ -399,7 +447,13 @@ if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   cd "${TCNATIVE_SOURCE_DIR}"
 
   echo "Building tcnative with OpenSSL ${OPENSSL_HOME}"
-  ./configure --with-apr=${APR_CONFIG} --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
+  if [ "yes" = "${OPENSSL_HOME}" ] ; then
+    # Use system OpenSSL - let configure auto-detect it
+    ./configure --with-apr=${APR_CONFIG} --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
+  else
+    # Use specified OpenSSL installation
+    ./configure --with-apr=${APR_CONFIG} --with-ssl="${OPENSSL_HOME}" --with-java-home="${TEST_JAVA_HOME}" --exec-prefix=NONE
+  fi
   # /usr/lib/jvm/java-6-sun/
 
   result=$?
