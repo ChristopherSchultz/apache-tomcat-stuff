@@ -1,5 +1,33 @@
 #!/bin/sh
 
+DEFAULT_OPENSSL_HOME="${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target"
+# Try to find the best JAVA_HOME
+if [ -z "$JAVA_HOME" ] ; then
+  if [ -d /Library/Java/JavaVirtualMachines ] ; then
+    # Get the highest-numbered Java
+    # e.g. /Library/Java/JavaVirtualMachines/temurin-25.jdk
+    num=$( ls -1 /Library/Java/JavaVirtualMachines/ | sed -e 's/.*-\([0-9]\)/\1/' | sort -nr | head -n 1 )
+    if [ '!' -z "$num" ] ; then
+      JAVA_HOME=$( ls -d1 /Library/Java/JavaVirtualMachines/*${num} | head -n 1 )
+      echo "Auto-detected JAVA_HOME=$JAVA_HOME"
+    fi
+  elif [ -d /usr/lib/jvm/ ] ; then
+    # Get the highest-numbered Java
+    # e.g. /usr/lib/jvm/java-11-openjdk-amd64/
+    num = $( ls -1 /usr/lib/jvm/java-* | sed -e 's/^[a-z]*-\([0-9]*\)-.*/\1/' | sort -nr | head -n 1 )
+    if [ '!' -z "$num" ] ; then
+      JAVA_HOME=$( ls -d1 /usr/lib/jvm/*-${num}-* | head -n 1 )
+      echo "Auto-detected JAVA_HOME=$JAVA_HOME"
+    fi
+  else
+    echo "Can't auto-detect JAVA_HOME"
+
+    exit 1
+  fi
+fi
+
+exit;
+
 TOMCAT_VERSION=
 RELEASE_TYPE=archive
 CLEAN=false
@@ -49,18 +77,6 @@ fi
 ##
 
 # Set default Java paths if not already set
-export JAVA_8_HOME="${JAVA_8_HOME:-/usr/local/java-8}"
-export JAVA_7_HOME="${JAVA_7_HOME:-/usr/local/java-7}"
-export JAVA_6_HOME="${JAVA_6_HOME:-${HOME}/packages/jdk1.6.0_45}"
-
-# Determine which Java version to use based on Tomcat version
-# NOTE: Tomcat 7 needs JAVA_HOME to point to Java 6
-if [ "7" = "$TOMCAT_MAJOR_VERSION" ] ; then
-  JAVA_HOME="${JAVA_HOME:-$JAVA_6_HOME}"
-  TEST_JAVA_HOME="${TEST_JAVA_HOME:-$JAVA_7_HOME}"
-else
-  JAVA_HOME="${JAVA_HOME:-$JAVA_7_HOME}"
-fi
 export TEST_JAVA_HOME="${TEST_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_JAVA_HOME="${BUILD_JAVA_HOME:-$JAVA_HOME}"
 export BUILD_NATIVE_JAVA_HOME="${BUILD_NATIVE_JAVA_HOME:-$JAVA_HOME}"
@@ -95,7 +111,7 @@ fi
 
 # Set up OpenSSL
 # Set default only if not already set
-export OPENSSL_HOME="${OPENSSL_HOME:-${HOME}/projects/apache/apache-tomcat/openssl-1.1.1/target}"
+export OPENSSL_HOME="${OPENSSL_HOME:-${DEFAULT_OPENSSL_HOME}}"
 
 # If OPENSSL_HOME is set but doesn't exist, try to use system OpenSSL
 if [ ! -z "${OPENSSL_HOME}" ] && [ "yes" != "${OPENSSL_HOME}" ] ; then
@@ -363,7 +379,6 @@ BASE_SOURCE_DIR="${BASE_DIR}/${BASE_FILE_NAME}-src"
 cat <<ENDEND > "${BASE_SOURCE_DIR}/build.properties"
 base.path=${BASE_DIR}/downloads
 execute.validate=true
-java.7.home=${JAVA_7_HOME}
 nsis.tool=makensis
 # TODO: This is specifically for MacOS
 openssl.ffm.1=-Dorg.apache.tomcat.util.openssl.USE_SYSTEM_LOAD_LIBRARY=true
