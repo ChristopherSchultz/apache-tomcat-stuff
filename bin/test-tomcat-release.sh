@@ -343,7 +343,8 @@ test.openssl.loc=${OPENSSL_HOME}/bin/openssl
 ENDEND
 fi
 
-if [ "$APR_HOME" != "" ] ; then
+# Set test.apr.loc to point to where we built tcnative (unless SKIP_TCNATIVE_BUILD is set)
+if [ -z "${SKIP_TCNATIVE_BUILD}" ] ; then
   cat <<ENDEND >> "${BASE_SOURCE_DIR}/build.properties"
 test.apr.loc=${BASE_SOURCE_DIR}/output/build/bin/native
 ENDEND
