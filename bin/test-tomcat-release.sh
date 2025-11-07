@@ -26,8 +26,6 @@ if [ -z "$JAVA_HOME" ] ; then
   fi
 fi
 
-exit;
-
 TOMCAT_VERSION=
 RELEASE_TYPE=archive
 CLEAN=false
