@@ -276,17 +276,6 @@ for binary in ${BINARIES} ; do
   fi
 done
 
-# Check to make sure tarball and zip contain the same files.
-rm -rf zip tarball
-mkdir zip
-mkdir tarball
-unzip -qd zip "${ZIPFILE}"
-tar xz --directory "tarball" -f "${TARBALL}"
-
-diff --strip-trailing-cr -qr zip tarball
-
-result=$?
-
 for source in ${SOURCES} ; do
 
   if [ ! -f "${source}" ] ; then
@@ -332,6 +321,17 @@ for source in ${SOURCES} ; do
     echo "* !! Invalid GPG signature for ${source}"
   fi
 done
+
+# Check to make sure binary tarball and zip contain the same files.
+rm -rf zip tarball
+mkdir zip
+mkdir tarball
+unzip -qd zip "${ZIPFILE}"
+tar xz --directory "tarball" -f "${TARBALL}"
+
+diff --strip-trailing-cr -qr zip tarball
+
+result=$?
 
 /bin/echo '*'
 
